@@ -9,6 +9,7 @@
 <meta name="generator" content="pandoc" />
 
 
+<meta name="author" content="Timothy Daley" />
 
 
 <title>It’s all about the zeros: estimating stochastic zeros in shallow scRNA-seq experiments</title>
@@ -116,12 +117,25 @@ $(document).ready(function () {
 
 
 <h1 class="title toc-ignore">It’s all about the zeros: estimating stochastic zeros in shallow scRNA-seq experiments</h1>
+<h4 class="author"><em>Timothy Daley</em></h4>
 
 </div>
 
 
-<p>In shallow single cell RNA-seq (scRNA-seq), the problem of zeros is pervasive. There are two main sources of zeros: genes that are not expressed and genes that are expressed but not sequenced. These are called systematic and stochastic zeros, respectively (<a href="https://genomebiology.biomedcentral.com/articles/10.1186/s13059-016-0947-7#Fig1">Lun et al 2016</a>). Stochastic zeros can arise from two sources: genes that were unsequenced due to the shallow sequencing depth and genes that dropped out due to technical effects. Distinguishing between the two is difficult.</p>
-<p>Consider the following model proposed by <a href="http://www.biorxiv.org/content/biorxiv/early/2015/12/27/025528.full.pdf">Hicks et al 2015</a>.</p>
+<p>In shallow single cell RNA-seq (scRNA-seq), the problem of zeros is pervasive. There are two main sources of zeros: genes that are not expressed and genes that are expressed but not sequenced. These are called systematic and stochastic zeros, respectively (<a href="https://genomebiology.biomedcentral.com/articles/10.1186/s13059-016-0947-7">Lun et al 2016</a>). Stochastic zeros can arise from two sources: genes that were unsequenced due to the shallow sequencing depth and genes that dropped out due to technical effects. Distinguishing between the two is difficult.</p>
+<p>Consider the following model proposed by <a href="http://www.biorxiv.org/content/biorxiv/early/2015/12/27/025528.full.pdf">Hicks et al 2015</a>. Let <span class="math inline">\(\lambda_{ij}\)</span> be the true unobserved expression level for gene <span class="math inline">\(j\)</span> in cell (or sample) <span class="math inline">\(i\)</span>. Let <span class="math inline">\(Z_{ij}\)</span> be an indicator variable denoting whether or not gene <span class="math inline">\(j\)</span> was amplified in cell <span class="math inline">\(i\)</span>. The observed expression <span class="math inline">\(X_{ij}\)</span> then has expectation equal to <span class="math display">\[\mathrm{E} (X_{ij}) = Z_{ij} \lambda_{ij}.\]</span> I will assume that conditional up <span class="math inline">\(Z_{ij} = 1\)</span> then <span class="math inline">\(X_{ij}\)</span> is a Poisson random variable with expectation <span class="math inline">\(\lambda_{ij}\)</span> and that the <span class="math inline">\(\lambda\)</span>s are iid distributed from some underlying compounding distribution <span class="math inline">\(\mu\)</span>. This model includes other models such as the Negative Binomial model described by <a href="https://genomebiology.biomedcentral.com/articles/10.1186/s13059-016-0947-7">Lun et al 2016</a>. Additionally I will assume (following Hicks et al) that <span class="math inline">\(Z_{ij}\)</span> is a Bernoulli random variable that depends only on the cell, i.e. <span class="math inline">\(Pr(Z_{ij} = 1) = p_{i}\)</span>.</p>
+<!-- 
+Suppose we observe expression $x_{ij} > 0$.  What is the expectation of $\lambda_{ij}$ conditional upon the non-zero observed expression level?  Note that if $x_{ij} > 0$ then necessarily $Z_{ij} = 1$.
+$$\mathrm{E} (\lambda_{ij} | x_{ij} = x, Z_{ij = 1}) = \frac{\mathrm{E} (\lambda \cdot 1(X_{ij} = x_{ij}) \cdot 1(Z_{ij} = 1))}{\Pr(X_{ij} = x_{ij}, Z_{ij} = 1)} = \frac{\int_{0}^{\infty} \lambda \frac{\lambda^{x} e^{-\lambda}}{x!} p_{i} d \mu (\lambda)}{\int_{0}^{\infty} \frac{\lambda^{x} e^{- \lambda}}{x!} p_{i} d \mu (\lambda)} = p_{i} \frac{(x + 1) \Pr(X = x + 1)}{\Pr(X = x)}.$$
+
+Now suppose we observed expression $x_{ij} = 0$.  What is the expectation of $\lambda_{ij}$ conditional upon the zero observed expression level?  In this case we do not know if the expression level is zero because of insufficient sequencing depth (or Poisson random noise) or if $Z_{ij} = 0$.  I will assume that if $Z_{ij} = 0$ then $\lambda_{ij} = 0$.
+$$\mathrm{E} (\lambda_{ij} | x_{ij} = 0) = \mathrm{E}(\lambda_{ij} | x_{ij} = 0) \Pr(Z_{ij} = 1) + \mathrm{E}(\lambda_{ij} | x_{ij}) \Pr(Z_{ij} = 0) = p_{i} \frac{\int_{0}^{\infty} \lambda e^{-\lambda} d \mu (\lambda)}{\int_{0}^{\infty} e^{- \lambda} d \mu (\lambda)} = p_{i} \frac{Pr(X = 1)}{\Pr(X = 0)}.$$ 
+-->
+<div id="estimating-p_i" class="section level1">
+<h1>Estimating <span class="math inline">\(p_{i}\)</span></h1>
+<p>Estimating <span class="math inline">\(p_{i}\)</span> is difficult because one can not seperate the stochastic zeros from the true zeros. The estimate of <span class="math inline">\(p_{i}\)</span> will inherently be biased by sequencing depth, as increased sequencing depth will mean a decrease in stochastic zeros. This is a problem in the current state of scRNA-seq as the field moves more towards low coverage sequencing of more cells (<a href="http://www.sciencedirect.com/science/article/pii/S0092867415005498">Macosko et al 2015</a>, <a href="http://www.sciencedirect.com/science/article/pii/S0092867416310078">Shekhar et al 2016</a>, <a href="http://www.sciencedirect.com/science/article/pii/S2405471216301090">Heimberg et al 2016</a>).</p>
+<p>The main problem is to estimate the number of genes with positive expression but were missed by random chance. This is a familiar problem in the capture-recapture literature, as we can see the immediate connection to such problems as estimating the number of words Shakespeare knew but are not in his writings <a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.460.3131&amp;rep=rep1&amp;type=pdf">Efron and Thisted 1976</a>, estimating the unobserved T-Cell <span class="math inline">\(\beta\)</span> repertoire <a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.460.3131&amp;rep=rep1&amp;type=pdf">Qi et al 2014</a>, or estimating the number of unobserved genomic variants in a population <a href="http://www.genetics.org/content/197/2/601.short">Gravel 2014</a> and <a href="http://www.nature.com/articles/ncomms13293">Zou et al 2016</a>. The main takeaway from these problems is that when sampling (sequencing in our case) is insufficiently deep then the observed number of genes is not a very good estimate of the number of expressed genes. (Example here).</p>
+</div>
 
 
 
