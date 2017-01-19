@@ -1,0 +1,8 @@
+---
+title: "It’s all about the zeros: estimating stochastic zeros in shallow scRNA-seq experiments"
+output: html_document
+---
+
+In shallow single cell RNA-seq (scRNA-seq), the problem of zeros is pervasive.  There are two main sources of zeros: genes that are not expressed and genes that are expressed but not sequenced.  These are called systematic and stochastic zeros, respectively ([Lun et al 2016](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-016-0947-7#Fig1)).  Stochastic zeros can arise from two sources: genes that were unsequenced due to the shallow sequencing depth and genes that dropped out due to technical effects.  Distinguishing between the two is difficult.
+
+Consider the following model proposed by [Hicks et al 2015](http://www.biorxiv.org/content/biorxiv/early/2015/12/27/025528.full.pdf).  
